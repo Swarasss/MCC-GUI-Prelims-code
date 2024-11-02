@@ -1,82 +1,71 @@
-# Import necessary libraries for ROS2, PyQt5, and messages
-import rclpy  # ROS2 library for handling nodes
-from rclpy.node import Node  # To create a custom ROS2 node
-from sensor_msgs.msg import Image  # Message type for camera images
-from std_msgs.msg import Float32  # Message type for position and battery data
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel  # GUI components from PyQt5
+import rclpy
+from rclpy.node import Node
+from rqt_gui_py.plugin import Plugin
+from python_qt_binding.QtWidgets import QLabel, QVBoxLayout, QWidget
+from std_msgs.msg import String, Float32
+from sensor_msgs.msg import Image
+import time
 
-# Define the GUI class using PyQt5 to create the user interface
-class MCCGuiWidget(QWidget):
-    def __init__(self):
-        super().__init__()  # Initialize the QWidget (base class)
-        self.setWindowTitle("MCC GUI")  # Set the title of the window
 
-        # Create a vertical layout to stack labels
-        self.layout = QVBoxLayout()
+class MyRqtPlugin(Plugin):
+    def __init__(self, context):
+        super(MyRqtPlugin, self).__init__(context)
+        self.setObjectName("MyRqtPlugin")
 
-        # Create labels to display the robot's status (initial values are 'Unknown')
-        self.robot_position_label = QLabel("Robot Position: Unknown")
-        self.battery_voltage_label = QLabel("Battery Voltage: Unknown")
-        self.camera_feed_label = QLabel("Camera Feed: (Loading...)")
+        # Create the main widget and layout
+        self._widget = QWidget()
+        layout = QVBoxLayout()
+        self._widget.setLayout(layout)
+
+        # Create labels to display various data
+        self.time_label = QLabel("Current Time: N/A")
+        self.position_label = QLabel("Robot Position: N/A")
+        self.battery_label = QLabel("Battery Voltage: N/A")
+        self.uptime_label = QLabel("Uptime: N/A")
 
         # Add the labels to the layout
-        self.layout.addWidget(self.robot_position_label)
-        self.layout.addWidget(self.battery_voltage_label)
-        self.layout.addWidget(self.camera_feed_label)
+        layout.addWidget(self.time_label)
+        layout.addWidget(self.position_label)
+        layout.addWidget(self.battery_label)
+        layout.addWidget(self.uptime_label)
 
-        # Set the layout for the GUI window
-        self.setLayout(self.layout)
+        # Initialize the ROS2 node
+        rclpy.init()
+        self.node = RqtNode(self)
 
-    # Function to update the robot's position label in the GUI
-    def update_robot_position(self, position):
-        self.robot_position_label.setText(f"Robot Position: {position}")
+        # Add the widget to the RQT context
+        context.add_widget(self._widget)
 
-    # Function to update the battery voltage label
-    def update_battery_voltage(self, voltage):
-        self.battery_voltage_label.setText(f"Battery Voltage: {voltage} V")
+    def shutdown_plugin(self):
+        """Shutdown the plugin and ROS2 node"""
+        self.node.destroy_node()
+        rclpy.shutdown()
 
-    # Function to update the camera feed label (placeholder for now)
-    def update_camera_feed(self, frame):
-        self.camera_feed_label.setText("Camera Feed: [New Image Frame]")
+    def save_settings(self, plugin_settings, instance_settings):
+        """Save the plugin's settings when needed"""
+        pass
 
-# Define the ROS2 node class that handles subscriptions to robot data
-class MCCNode(Node):
-    def __init__(self):
-        super().__init__('mcc_gui_node')  # Initialize the node with a name
-        # Subscribe to the robot's position topic (Float32 message)
-        self.position_sub = self.create_subscription(Float32, '/robot/position', self.position_callback, 10)
-        # Subscribe to the battery voltage topic (Float32 message)
-        self.battery_sub = self.create_subscription(Float32, '/robot/battery_voltage', self.battery_callback, 10)
-        # Subscribe to the camera feed topic (Image message)
-        self.camera_sub = self.create_subscription(Image, '/robot/camera_feed', self.camera_callback, 10)
+    def restore_settings(self, plugin_settings, instance_settings):
+        """Restore the plugin's settings when needed"""
+        pass
 
-    # Callback function to update the robot's position in the GUI
+
+class RqtNode(Node):
+    def __init__(self, gui_plugin):
+        super().__init__("my_rqt_plugin_node")
+        self.gui_plugin = gui_plugin
+
+        # Subscribe to relevant topics
+        self.create_subscription(String, "/current_time", self.time_callback, 10)
+        self.create_subscription(Float32, "/robot/position", self.position_callback, 10)
+        self.create_subscription(Float32, "/robot/battery_voltage", self.battery_callback, 10)
+
+    # Callback functions to update the GUI
+    def time_callback(self, msg):
+        self.gui_plugin.time_label.setText(f"Current Time: {msg.data}")
+
     def position_callback(self, msg):
-        gui_widget.update_robot_position(msg.data)  # Pass new position data to the GUI
+        self.gui_plugin.position_label.setText(f"Robot Position: {msg.data}")
 
-    # Callback function to update the battery voltage in the GUI
     def battery_callback(self, msg):
-        gui_widget.update_battery_voltage(msg.data)  # Pass new voltage data to the GUI
-
-    # Callback function to update the camera feed status in the GUI
-    def camera_callback(self, msg):
-        gui_widget.update_camera_feed(msg)  # Pass new camera data to the GUI (placeholder)
-
-# Main function to start the GUI and ROS2 node
-def main():
-    rclpy.init()  # Initialize the ROS2 system
-
-    global gui_widget  # Make the GUI widget accessible throughout the program
-    gui_widget = MCCGuiWidget()  # Create an instance of the GUI
-
-    node = MCCNode()  # Create an instance of the ROS2 node
-
-    gui_widget.show()  # Display the GUI window
-    rclpy.spin(node)  # Keep the node running and listening for new data
-
-    node.destroy_node()  # Clean up the node when done
-    rclpy.shutdown()  # Shut down the ROS2 system
-
-# Entry point to run the program
-if __name__ == '__main__':
-    main()  # Run the main function
+        self.gui_plugin.battery_label.setText(f"Battery Voltage: {msg.data} V")
