@@ -1,0 +1,14 @@
+xml
+Copy code
+<library path="src">
+  <class name="MyRqtPlugin" type="my_rqt_plugin.MyRqtPlugin" base_class_type="rqt_gui_py::Plugin">
+    <description>
+      A custom RQT plugin to display various robot data, such as time, position, and battery voltage.
+    </description>
+    <qtgui>
+      <label>My RQT Plugin</label>
+      <icon type="theme">settings</icon>
+      <statustip>Displays various robot status information.</statustip>
+    </qtgui>
+  </class>
+</library>
